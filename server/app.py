@@ -1,8 +1,5 @@
-#!/usr/bin/env python3
-
-from flask import Flask, make_response, jsonify
+from flask import Flask, make_response, jsonify, request
 from flask_migrate import Migrate
-
 from models import db, Bakery, BakedGood
 
 app = Flask(__name__)
@@ -30,10 +27,17 @@ def bakeries():
     )
     return response
 
-@app.route('/bakeries/<int:id>')
+@app.route('/bakeries/<int:id>', methods=['GET', 'PATCH'])
 def bakery_by_id(id):
 
     bakery = Bakery.query.filter_by(id=id).first()
+
+    if request.method == 'PATCH':
+        name = request.form.get('name')
+        if name:
+            bakery.name = name
+            db.session.commit()
+
     bakery_serialized = bakery.to_dict()
 
     response = make_response(
@@ -41,6 +45,53 @@ def bakery_by_id(id):
         200
     )
     return response
+
+@app.route('/baked_goods', methods=['POST'])
+def baked_goods():
+    name = request.form.get('name')
+    price = request.form.get('price')
+    bakery_id = request.form.get('bakery_id')
+
+    if name and price and bakery_id:
+        baked_good = BakedGood(name=name, price=price, bakery_id=bakery_id)
+        db.session.add(baked_good)
+        db.session.commit()
+
+        baked_good_serialized = baked_good.to_dict()
+
+        response = make_response(
+            baked_good_serialized,
+            201
+        )
+    else:
+        response = make_response(
+            jsonify(error="Missing required parameter"),
+            400
+        )
+
+    return response
+
+@app.route('/baked_goods/<int:id>', methods=['DELETE'])
+def baked_good_by_id(id):
+
+    baked_good = BakedGood.query.filter_by(id=id).first()
+
+    if baked_good:
+        db.session.delete(baked_good)
+        db.session.commit()
+
+        response = make_response(
+            jsonify(message="Baked good successfully deleted"),
+            200
+        )
+    else:
+        response = make_response(
+            jsonify(error="Baked good not found"),
+            404
+        )
+
+    return response
+
 
 @app.route('/baked_goods/by_price')
 def baked_goods_by_price():
